@@ -183,10 +183,8 @@ class VectorStore:
                     "Query embedding dimensions do not match."
                 )
 
-            # Calculate cosine similarity.
             scores = self.vectors @ query_vector
 
-            # Filter by PDF filename.
             if source:
 
                 matching_indexes = [
@@ -204,10 +202,8 @@ class VectorStore:
             if not matching_indexes:
                 return []
 
-            # Get scores for matching documents.
             matching_scores = scores[matching_indexes]
 
-            # Select top relevant chunks.
             top_positions = np.argsort(
                 matching_scores
             )[::-1][:top_k]

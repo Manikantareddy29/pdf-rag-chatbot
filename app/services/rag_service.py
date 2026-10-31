@@ -35,7 +35,6 @@ def ingest_pdf(pdf_path):
 
     file_hash = calculate_file_hash(pdf_path)
 
-    # Avoid indexing the same unchanged PDF twice.
     if vector_store.has_document(source, file_hash):
 
         return {
@@ -84,7 +83,6 @@ def ingest_pdf(pdf_path):
             "text": chunk["text"]
         })
 
-    # Replace the previous index if this filename has changed.
     vector_store.remove_document(source)
 
     vector_store.add_chunks(
@@ -135,314 +133,10 @@ def ingest_folder(folder_path):
     }
 
 
-# def answer_question(question, top_k=TOP_K):
-
-#     total_start = time.perf_counter()
-
-#     # 1. Generate query embedding
-#     start = time.perf_counter()
-
-#     query_embedding = generate_embeddings([
-#         question
-#     ])[0]
-
-#     embedding_time = time.perf_counter() - start
-
-#     print(
-#         f"Embedding time: {embedding_time:.2f} seconds",
-#         flush=True
-#     )
-
-#     # 2. Identify PDF filename from the question
-#     pdf_match = re.search(
-#         r'([\w.-]+\.pdf)',
-#         question,
-#         re.IGNORECASE
-#     )
-
-#     source = pdf_match.group(1) if pdf_match else None
-
-#     # 3. Retrieve relevant chunks
-#     start = time.perf_counter()
-
-#     retrieved_chunks = vector_store.search(
-#         query_embedding,
-#         top_k=top_k,
-#         source=source
-#     )
-
-#     vector_search_time = time.perf_counter() - start
-
-#     print(
-#         f"Vector search time: {vector_search_time:.2f} seconds",
-#         flush=True
-#     )
-
-#     # Sort retrieved chunks by page number
-#     retrieved_chunks.sort(
-#         key=lambda item: item["page_number"]
-#     )
-
-#     # Check whether relevant chunks were found
-#     if not retrieved_chunks:
-
-#         if source:
-#             message = (
-#                 f"No indexed content found for {source}. "
-#                 "Please check the filename or upload the PDF."
-#             )
-#         else:
-#             message = (
-#                 "No documents have been indexed yet. "
-#                 "Please upload a PDF first."
-#             )
-
-#         total_time = time.perf_counter() - total_start
-
-#         print(
-#             f"Total processing time: {total_time:.2f} seconds",
-#             flush=True
-#         )
-
-#         return {
-#             "answer": message,
-#             "citations": [],
-#             "retrieved_chunks": [],
-#             "timings": {
-#                 "embedding_seconds": round(embedding_time, 2),
-#                 "vector_search_seconds": round(vector_search_time, 2),
-#                 "total_seconds": round(total_time, 2)
-#             }
-#         }
-
-#     # 4. Prepare context for the LLM
-#     start = time.perf_counter()
-
-#     context_parts = []
-
-#     for chunk in retrieved_chunks:
-
-#         context_parts.append(
-#         f"""
-# Source: {chunk['source']}
-# Page: {chunk['page_number']}
-# Content:
-# {chunk['text'][:600]}
-# """
-#     )
-
-
-#     context = "\n\n".join(context_parts)
-
-#     # 5. Prepare the LLM prompt
-#     prompt = f"""
-# You are a helpful PDF question-answering assistant.
-
-# Answer the user's question using ONLY the provided context.
-
-# Instructions:
-# 1. Do not invent information.
-# 2. If the answer is not available in the context, say so clearly.
-# 3. Give a simple and clear answer.
-# 4. Add citations using this format:
-#    [Source: filename.pdf, Page: 10]
-# 5. Use the actual source filenames and page numbers provided.
-# 6. Do not create fake citations.
-
-# Context:
-
-# {context}
-
-# User Question:
-
-# {question}
-
-# Answer:
-# """
-
-#     context_time = time.perf_counter() - start
-
-#     print(
-#         f"Context preparation time: {context_time:.2f} seconds",
-#         flush=True
-#     )
-    
-#     # 6. Generate answer using Ollama
-#     start = time.perf_counter()
-
-#     response = ollama.chat(
-#         model=OLLAMA_MODEL,
-#         messages=[
-#             {
-#                 "role": "user",
-#                 "content": prompt
-#             }
-#         ],
-#         options={
-#             "temperature": 0.1,
-#             "num_predict": 80,
-#             "num_ctx": 2048
-#         },
-#         keep_alive="10m"
-#     )
-
-#     # Calculate total Ollama response time
-#     llm_time = time.perf_counter() - start
-
-#     # Get detailed Ollama performance metrics
-#     load_time = getattr(response, "load_duration", 0) or 0
-#     prompt_time = getattr(response, "prompt_eval_duration", 0) or 0
-#     prompt_tokens = getattr(
-#         response,
-#         "prompt_eval_count",
-#         0
-#     ) or 0
-
-#     prompt_eval_rate = (
-#         prompt_tokens / (prompt_time / 1e9)
-#         if prompt_time > 0 else 0
-#     )
-
-#     print(
-#         f"Input prompt tokens: {prompt_tokens}",
-#         flush=True
-#     )
-
-#     print(
-#         f"Prompt processing speed: {prompt_eval_rate:.2f} tokens/sec",
-#         flush=True
-#     )
-#     generation_time = getattr(response, "eval_duration", 0) or 0
-#     generated_tokens = getattr(response, "eval_count", 0) or 0
-
-#     # Print Ollama performance details
-#     print("-" * 40, flush=True)
-#     print("OLLAMA PERFORMANCE DETAILS", flush=True)
-
-#     print(
-#         f"Ollama total time: {llm_time:.2f}s",
-#         flush=True
-#     )
-
-#     print(
-#         f"Model loading time: {load_time / 1e9:.2f}s",
-#         flush=True
-#     )
-
-#     print(
-#         f"Prompt processing time: {prompt_time / 1e9:.2f}s",
-#         flush=True
-#     )
-
-#     print(
-#         f"Token generation time: {generation_time / 1e9:.2f}s",
-#         flush=True
-#     )
-
-#     print(
-#         f"Generated tokens: {generated_tokens}",
-#         flush=True
-#     )
-
-#     # Calculate token generation speed
-#     if generation_time > 0:
-
-#         tokens_per_second = (
-#             generated_tokens / (generation_time / 1e9)
-#         )
-
-#         print(
-#             f"Generation speed: {tokens_per_second:.2f} tokens/sec",
-#             flush=True
-#         )
-
-#     print("-" * 40, flush=True)
-
-#     # Extract generated answer
-#     answer = response.message.content
-
-
-#     answer = response.message.content
-
-#     # 7. Prepare unique citations
-#     start = time.perf_counter()
-
-#     citations = []
-#     seen = set()
-
-#     for chunk in retrieved_chunks:
-
-#         citation = (
-#             chunk["source"],
-#             chunk["page_number"]
-#         )
-
-#         if citation not in seen:
-
-#             seen.add(citation)
-
-#             citations.append({
-#                 "filename": chunk["source"],
-#                 "page_number": chunk["page_number"]
-#             })
-
-#     # 8. Prepare retrieved chunk details
-#     formatted_chunks = []
-
-#     for chunk in retrieved_chunks:
-
-#         formatted_chunks.append({
-#             "filename": chunk["source"],
-#             "page_number": chunk["page_number"],
-#             "similarity": round(
-#                 chunk["similarity"],
-#                 4
-#             ),
-#             "text": chunk["text"]
-#         })
-
-#     formatting_time = time.perf_counter() - start
-
-#     print(
-#         f"Response formatting time: {formatting_time:.2f} seconds",
-#         flush=True
-#     )
-
-#     # 9. Calculate total processing time
-#     total_time = time.perf_counter() - total_start
-
-#     print("=" * 40, flush=True)
-#     print("RAG PERFORMANCE SUMMARY", flush=True)
-#     print(f"Embedding: {embedding_time:.2f}s", flush=True)
-#     print(f"Vector search: {vector_search_time:.2f}s", flush=True)
-#     print(f"Context preparation: {context_time:.2f}s", flush=True)
-#     print(f"LLM generation: {llm_time:.2f}s", flush=True)
-#     print(f"Formatting: {formatting_time:.2f}s", flush=True)
-#     print(f"TOTAL: {total_time:.2f}s", flush=True)
-#     print("=" * 40, flush=True)
-
-#     # 10. Return final response
-#     return {
-#         "answer": answer,
-#         "citations": citations,
-#         "retrieved_chunks": formatted_chunks,
-#         "timings": {
-#             "embedding_seconds": round(embedding_time, 2),
-#             "vector_search_seconds": round(vector_search_time, 2),
-#             "context_preparation_seconds": round(context_time, 2),
-#             "llm_generation_seconds": round(llm_time, 2),
-#             "formatting_seconds": round(formatting_time, 2),
-#             "total_seconds": round(total_time, 2)
-#         }
-#     }
-
-
-
 def answer_question(question, top_k=TOP_K):
 
     total_start = time.perf_counter()
 
-    # 1. Generate query embedding
     start = time.perf_counter()
 
     query_embedding = generate_embeddings([question])[0]
@@ -451,7 +145,6 @@ def answer_question(question, top_k=TOP_K):
 
     print(f"Embedding time: {embedding_time:.2f} seconds", flush=True)
 
-    # 2. Identify PDF filename from the question
     pdf_match = re.search(
         r'([\w.-]+\.pdf)',
         question,
@@ -460,7 +153,6 @@ def answer_question(question, top_k=TOP_K):
 
     source = pdf_match.group(1) if pdf_match else None
 
-    # 3. Retrieve more candidates for reranking
     start = time.perf_counter()
 
     candidate_k = max(top_k * 3, 10)
@@ -478,7 +170,6 @@ def answer_question(question, top_k=TOP_K):
         flush=True
     )
 
-    # Check whether relevant chunks were found
     if not retrieved_chunks:
 
         if source:
@@ -505,7 +196,6 @@ def answer_question(question, top_k=TOP_K):
             }
         }
 
-    # 4. Keyword-based reranking
     start = time.perf_counter()
 
     stop_words = {
@@ -546,13 +236,11 @@ def answer_question(question, top_k=TOP_K):
             0.3 * keyword_score
         )
 
-    # Sort by combined relevance score
     retrieved_chunks.sort(
         key=lambda item: item["rerank_score"],
         reverse=True
     )
 
-    # Select final top K chunks
     retrieved_chunks = retrieved_chunks[:top_k]
 
     reranking_time = time.perf_counter() - start
@@ -562,7 +250,6 @@ def answer_question(question, top_k=TOP_K):
         flush=True
     )
 
-    # 5. Prepare context for the LLM
     start = time.perf_counter()
 
     context_parts = []
@@ -580,7 +267,6 @@ Content:
 
     context = "\n\n".join(context_parts)
 
-    # 6. Prepare the LLM prompt
     prompt = f"""
 You are a helpful PDF question-answering assistant.
 
@@ -613,7 +299,6 @@ Answer:
         flush=True
     )
 
-    # 7. Generate answer using Ollama
     start = time.perf_counter()
 
     response = ollama.chat(
@@ -634,7 +319,6 @@ Answer:
 
     llm_time = time.perf_counter() - start
 
-    # 8. Get Ollama performance metrics
     load_time = getattr(response, "load_duration", 0) or 0
     prompt_time = getattr(response, "prompt_eval_duration", 0) or 0
     prompt_tokens = getattr(response, "prompt_eval_count", 0) or 0
@@ -664,7 +348,6 @@ Answer:
 
     answer = response.message.content
 
-    # 9. Prepare unique citations
     start = time.perf_counter()
 
     citations = []
@@ -685,7 +368,6 @@ Answer:
                 "page_number": chunk["page_number"]
             })
 
-    # 10. Prepare retrieved chunk details
     formatted_chunks = []
 
     for chunk in retrieved_chunks:
@@ -705,7 +387,6 @@ Answer:
         flush=True
     )
 
-    # 11. Calculate total processing time
     total_time = time.perf_counter() - total_start
 
     print("=" * 40, flush=True)
@@ -719,7 +400,6 @@ Answer:
     print(f"TOTAL: {total_time:.2f}s", flush=True)
     print("=" * 40, flush=True)
 
-    # 12. Return final response
     return {
         "answer": answer,
         "citations": citations,
