@@ -1,0 +1,36 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+
+# Virtual environment
+venv/
+.env/
+.venv/
+
+# Environment variables and secrets
+.env
+.env.*
+
+# Uploaded PDF documents
+documents/uploads/*
+!documents/uploads/.gitkeep
+
+# Generated vector database
+vector_store/*
+!vector_store/.gitkeep
+
+# Model files
+models/*
+
+# IDE files
+.vscode/
+.idea/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
